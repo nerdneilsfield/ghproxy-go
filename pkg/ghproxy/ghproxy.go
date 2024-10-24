@@ -51,6 +51,14 @@ func loggerClientInfo(c *fiber.Ctx) {
 	remoteAddr := c.Context().RemoteAddr().String()
 	xForwardedFor := c.Get("X-Forwarded-For")
 	requestURL := c.OriginalURL()
+	cfIP := c.Get("CF-Connecting-IP")
+	trueClientIP := c.Get("True-Client-IP")
+
+	if cfIP != "" {
+		remoteIP = cfIP
+	} else if trueClientIP != "" {
+		remoteIP = trueClientIP
+	}
 
 	logger.Debug("Client info", zap.String("remote_ip", remoteIP), zap.String("remote_addr", remoteAddr), zap.String("x_forwarded_for", xForwardedFor), zap.String("request_url", requestURL))
 }
@@ -146,6 +154,34 @@ func Run(host string, port int, proxyJsDelivr bool) {
 		c.Response().Header.Set("Pragma", "no-cache")
 		c.Response().Header.Set("Expires", "0")
 		return c.Send(indexHTML)
+	})
+
+	app.Get("/ip", func(c *fiber.Ctx) error {
+		ip := c.IP()
+		if cfIP := c.Get("CF-Connecting-IP"); cfIP != "" {
+			ip = cfIP
+		} else if trueIP := c.Get("True-Client-IP"); trueIP != "" {
+			ip = trueIP
+		} else if xFF := c.Get("X-Forwarded-For"); xFF != "" {
+			ip = xFF
+		}
+		loggerClientInfo(c)
+		logger.Debug("Client IP", zap.String("ip", ip))
+		return c.SendString(ip)
+	})
+
+	app.Get("/ip/json", func(c *fiber.Ctx) error {
+		loggerClientInfo(c)
+		return c.JSON(fiber.Map{
+			"ip":              c.IP(),
+			"cf_ip":           c.Get("CF-Connecting-IP"),
+			"true_ip":         c.Get("True-Client-IP"),
+			"x_forwarded_for": c.Get("X-Forwarded-For"),
+			"address":         c.Context().RemoteAddr().String(),
+			"user_agent":      c.Get("User-Agent"),
+			"referer":         c.Get("Referer"),
+			"request_url":     c.OriginalURL(),
+		})
 	})
 
 	// Favicon route

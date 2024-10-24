@@ -1,22 +1,20 @@
 package ghproxy
 
 import (
-	"bytes"
 	"embed"
 	"fmt"
-	"io"
-	"net/http"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	loggerPkg "github.com/nerdneilsfield/shlogin/pkg/logger"
+	"github.com/valyala/fasthttp"
 	"go.uber.org/zap"
 )
 
 const (
 	sizeLimit int64 = 1024 * 1024 * 1024 * 999
-	assetURL        = "https://hunshcn.github.io/gh-proxy"
 	chunkSize int64 = 1024 * 10
 )
 
@@ -27,6 +25,13 @@ var indexHTMLFS embed.FS
 
 //go:embed favicon.ico
 var faviconFS embed.FS
+
+var httpClient = &fasthttp.Client{
+	MaxConnsPerHost:     1000,
+	MaxIdleConnDuration: time.Minute * 5,
+	ReadBufferSize:      64 * 1024, // 增加读取缓冲区大小到 64KB
+	WriteBufferSize:     64 * 1024, // 同时增加写入缓冲区大小
+}
 
 var (
 	whiteList = []string{}
@@ -62,65 +67,57 @@ func checkURL(u string) []string {
 
 func proxy(targetURL string, allowRedirects bool, c *fiber.Ctx) error {
 	logger.Debug("Proxy to", zap.String("target_url", targetURL))
-	client := &http.Client{
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			if !allowRedirects {
-				return http.ErrUseLastResponse
-			}
-			return nil
-		},
-	}
+	req := fasthttp.AcquireRequest()
+	defer fasthttp.ReleaseRequest(req)
+	resp := fasthttp.AcquireResponse()
+	defer fasthttp.ReleaseResponse(resp)
 
-	// Create new request
-	proxyReq, err := http.NewRequest(c.Method(), targetURL, bytes.NewReader(c.Body()))
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
-	}
+	req.SetRequestURI(targetURL)
+	req.Header.SetMethod(c.Method())
 
-	// Copy headers
+	// 复制请求头
 	c.Request().Header.VisitAll(func(key, value []byte) {
 		if string(key) != "Host" {
-			proxyReq.Header.Add(string(key), string(value))
+			req.Header.Add(string(key), string(value))
 		}
 	})
 
-	// Make request
-	resp, err := client.Do(proxyReq)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
-	}
-	defer resp.Body.Close()
-
-	// Check size limit
-	if contentLength := resp.Header.Get("Content-Length"); contentLength != "" {
-		var size int64
-		if _, err := fmt.Sscanf(contentLength, "%d", &size); err == nil && size > sizeLimit {
-			return c.Redirect(targetURL)
+	// 自定义重定向处理
+	maxRedirects := 10
+	for i := 0; i < maxRedirects; i++ {
+		err := httpClient.Do(req, resp)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 		}
-	}
 
-	// Copy response headers
-	for key, values := range resp.Header {
-		for _, value := range values {
-			c.Response().Header.Add(key, value)
+		// 检查内容长度
+		if contentLength := resp.Header.Peek("Content-Length"); contentLength != nil {
+			var size int64
+			if _, err := fmt.Sscanf(string(contentLength), "%d", &size); err == nil && size > sizeLimit {
+				return c.Redirect(targetURL)
+			}
 		}
-	}
 
-	// Handle redirects
-	if location := resp.Header.Get("Location"); location != "" {
-		if matches := checkURL(location); matches != nil {
-			c.Response().Header.Set("Location", "/"+location)
+		// 检查是否为重定向状态码
+		if resp.StatusCode() >= 300 && resp.StatusCode() < 400 && allowRedirects {
+			location := resp.Header.Peek("Location")
+			if location == nil {
+				break
+			}
+			req.SetRequestURI(string(location))
+			resp.Reset()
 		} else {
-			return proxy(location, true, c)
+			break
 		}
 	}
 
-	c.Status(resp.StatusCode)
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-	return c.Send(body)
+	// 复制响应头和内容到客户端
+	resp.Header.VisitAll(func(key, value []byte) {
+		c.Response().Header.Add(string(key), string(value))
+	})
+
+	c.Status(resp.StatusCode())
+	return c.Send(resp.Body())
 }
 
 func Run(host string, port int, proxyJsDelivr bool) {

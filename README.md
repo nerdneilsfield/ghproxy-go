@@ -16,7 +16,7 @@ ghproxy-go is a high-performance reverse proxy for GitHub resources written in G
 ### Installation
 
 #### Binary Release
-Download the pre-compiled binary from the [Releases](https://github.com/yourusername/ghproxy-go/releases) page.
+Download the pre-compiled binary from the [Releases](https://github.com/nerdneilsfield/ghproxy-go/releases) page.
 
 #### Docker
 ```bash
@@ -72,7 +72,7 @@ ghproxy-go 是一个用 Go 语言编写的 GitHub 资源反向代理工具，通
 ### 安装
 
 #### 二进制安装
-从 [Releases](https://github.com/yourusername/ghproxy-go/releases) 页面下载预编译的二进制文件。
+从 [Releases](https://github.com/nerdneilsfield/ghproxy-go/releases) 页面下载预编译的二进制文件。
 
 #### Docker 安装
 ```bash

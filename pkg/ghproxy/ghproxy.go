@@ -94,6 +94,7 @@ func proxy(targetURL string, allowRedirects bool, c *fiber.Ctx) error {
 		if contentLength := resp.Header.Peek("Content-Length"); contentLength != nil {
 			var size int64
 			if _, err := fmt.Sscanf(string(contentLength), "%d", &size); err == nil && size > sizeLimit {
+				logger.Warn("Content-Length exceeds limit", zap.Int64("size", size), zap.String("url", targetURL), zap.String("limit", fmt.Sprintf("%d", sizeLimit)))
 				return c.Redirect(targetURL)
 			}
 		}
@@ -104,6 +105,7 @@ func proxy(targetURL string, allowRedirects bool, c *fiber.Ctx) error {
 			if location == nil {
 				break
 			}
+			logger.Debug("Redirect to", zap.String("location", string(location)))
 			req.SetRequestURI(string(location))
 			resp.Reset()
 		} else {
@@ -188,7 +190,7 @@ func Run(host string, port int, proxyJsDelivr bool) {
 			path = strings.Replace(path, "/blob/", "/raw/", 1)
 		}
 
-		return proxy(path, false, c)
+		return proxy(path, true, c)
 	})
 
 	addr := fmt.Sprintf("%s:%d", host, port)

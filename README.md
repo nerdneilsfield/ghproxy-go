@@ -13,6 +13,19 @@ ghproxy-go is a high-performance reverse proxy for GitHub resources written in G
 - Docker support
 - Easy to deploy and configure
 
+### Homebrew / Scoop
+
+```bash
+# macOS / Linux
+brew install --cask nerdneilsfield/apps/ghproxy-go
+```
+
+```powershell
+# Windows
+scoop bucket add nerdneilsfield https://github.com/nerdneilsfield/homebrew-apps
+scoop install nerdneilsfield/ghproxy-go
+```
+
 ### Installation
 
 #### Binary Release
@@ -68,6 +81,19 @@ ghproxy-go 是一个用 Go 语言编写的 GitHub 资源反向代理工具，通
 - 支持多种 GitHub URL 模式
 - 支持 Docker 部署
 - 易于部署和配置
+
+### 通过 Homebrew / Scoop 安装
+
+```bash
+# macOS / Linux
+brew install --cask nerdneilsfield/apps/ghproxy-go
+```
+
+```powershell
+# Windows
+scoop bucket add nerdneilsfield https://github.com/nerdneilsfield/homebrew-apps
+scoop install nerdneilsfield/ghproxy-go
+```
 
 ### 安装
 

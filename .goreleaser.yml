@@ -145,3 +145,33 @@ changelog:
       order: 400
     - title: Other work
       order: 9999
+
+# Publish to the nerdneilsfield/homebrew-apps tap and Scoop bucket.
+homebrew_casks:
+  - name: ghproxy-go
+    homepage: https://github.com/nerdneilsfield/ghproxy-go
+    description: Go implementation of ghproxy
+    binaries:
+      - ghproxy-go
+    directory: Casks
+    repository:
+      owner: nerdneilsfield
+      name: homebrew-apps
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+    hooks:
+      post:
+        install_steps: |
+          on_macos do
+            run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ .StagedPath }}/ghproxy-go"]
+          end
+
+scoops:
+  - name: ghproxy-go
+    homepage: https://github.com/nerdneilsfield/ghproxy-go
+    description: Go implementation of ghproxy
+    license: BSD-3-Clause
+    directory: bucket
+    repository:
+      owner: nerdneilsfield
+      name: homebrew-apps
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
